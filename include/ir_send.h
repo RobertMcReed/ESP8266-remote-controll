@@ -7,6 +7,7 @@
 #define IR_SEND_h
 
 void irSendSetup();
+void systemPower();
 void tvPower();
 void tvInput();
 void avOff();
@@ -20,5 +21,6 @@ void avInputVideo1();
 void avInputDVD();
 void avInputPhono();
 void avInputCD();
+void tvLoop();
 
 #endif

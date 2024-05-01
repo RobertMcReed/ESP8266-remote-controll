@@ -1,25 +1,26 @@
 #include "mqtt.h"
-#include "ir_send.h"
-
+#include "tv_status.h"
 // how long to wait between connection attempts
 uint32_t MQTT_CONNECT_DELAY = 10000;
 
 // how long to wait before advertising to HA
 uint32_t MQTT_DISCOVERY_DELAY = 300000;
 
+// how long to wait before publishing tv power status
+uint32_t MQTT_TV_STATUS_DELAY = 1000;
+
 const unsigned long before = millis() - MQTT_CONNECT_DELAY - MQTT_DISCOVERY_DELAY;
 unsigned long last_discovery = before;
 unsigned long last_connect_attempt = before;
+unsigned long last_tv_status = before;
 
 const char* client_id = "remote_control";
-const char *temperature_topic = "remote_control/temperature";
-const char *humidity_topic = "remote_control/humidity";
-const char *heat_index_topic = "remote_control/heat_index";
 
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
 
 void subscribeToTopics() {
+  mqtt_client.subscribe("remote_control/tv_av_power");
   mqtt_client.subscribe("remote_control/tv_power");
   mqtt_client.subscribe("remote_control/tv_input");
   mqtt_client.subscribe("remote_control/av_off");
@@ -38,9 +39,18 @@ void subscribeToTopics() {
 void publishHomeAssistantDiscovery() {
   last_discovery = millis();
   Serial.println("Sending Home Assistant Configuration Topics...");
+  mqtt_client.publish("homeassistant/switch/tv_av_power/config",
+    "{\"name\":\"TV/AV Power\",\"uniq_id\":\"tv_av_power\",\"cmd_t\":\"remote_control/tv_av_power\",\"stat_t\":\"homeassistant/switch/tv_av_power/state\"}"
+  );
+  // mqtt_client.publish("homeassistant/button/system_power/config",
+  //   "{\"name\":\"System Power\",\"cmd_t\":\"remote_control/system_power\"}"
+  // );
   mqtt_client.publish("homeassistant/button/tv_power/config",
     "{\"name\":\"TV Power\",\"cmd_t\":\"remote_control/tv_power\"}"
   );
+  // mqtt_client.publish("homeassistant/binary_sensor/tv_status/config",
+  //   "{\"name\":\"TV Status\",\"dev_cla\":\"power\",\"stat_t\":\"homeassistant/binary_sensor/tv_status/state\"}"
+  // );
   mqtt_client.publish("homeassistant/button/tv_input/config",
     "{\"name\":\"TV Input\",\"cmd_t\":\"remote_control/tv_input\"}"
   );
@@ -83,7 +93,9 @@ void callback(String topic, byte* message, unsigned int length) {
   Serial.print("Received topic: ");
   Serial.println(topic);
 
-  if (topic.indexOf("tv_power") > 0) {
+  if (topic.indexOf("tv_av_power") > 0) {
+    systemPower();
+  } else if (topic.indexOf("tv_power") > 0) {
     tvPower();
   } else if (topic.indexOf("tv_input") > 0) {
     tvInput();
@@ -149,6 +161,12 @@ void mqttLoop() {
   if (!mqtt_client.loop()) { return; } // tick for callback
     
   unsigned long now = millis();
+
+  if (now - last_tv_status > MQTT_TV_STATUS_DELAY) {
+    // publish the TV Status every second
+    mqtt_client.publish("homeassistant/switch/tv_av_power/state", getTvStatus() ? "ON" : "OFF");
+    last_tv_status = now;
+  }
 
   if (now - last_discovery > MQTT_DISCOVERY_DELAY) {
     // publish the discovery config every 5 minutes in case HA was down

@@ -1,11 +1,31 @@
 #include "wifi.h"
-#include "ir_send.h"
 
 ESP8266AutoIOT app((char*)__SSID__, (char*)__PW__);
+
+String handleGetTvStatus() {
+  return String(getTvStatus());
+}
+
+void setPhotoresistorThreshold(String thresh) {
+  setThreshold(thresh.toInt());
+}
+
+String getPhotoresistorThreshold() {
+  return String(getThreshold());
+}
+
+String handleGetPhotoresistor() {
+  return String(getPhotoresistorValue());
+}
 
 void setupWifi() {
   app.disableLED();
   app.root(HTML);
+  app.post("/system/power", systemPower);
+  app.post("/photoresistor/threshold", setPhotoresistorThreshold);
+  app.get("/photoresistor/threshold/value", getPhotoresistorThreshold);
+  app.get("/photoresistor", handleGetPhotoresistor);
+  app.get("/tv/status", handleGetTvStatus);
   app.post("/tv/power", tvPower);
   app.post("/tv/input", tvInput);
   app.post("/av/off", avOff);

@@ -5,3 +5,4 @@
 .vscode/ipch
 .env
 include/html.h
+.DS_Store
